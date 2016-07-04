@@ -1,0 +1,19 @@
+name:                Booking
+version:             0.1.0.0
+synopsis:            Handling a reservation request in Haskell. Proof of concept
+description:         Please see README.md
+homepage:            https://gist.github.com/ploeh/c999e2ae2248bd44d775
+license:             MIT
+license-file:        LICENSE
+author:              Mark Seemann
+maintainer:          example@example.com
+copyright:           2016 Mark Seemann
+category:            Web
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src 
+  exposed-modules:     ApiModel, App, DB
+  default-language:    Haskell2010
+  build-depends:       base, directory, filepath, time, mtl, either

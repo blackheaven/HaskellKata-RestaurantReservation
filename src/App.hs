@@ -31,5 +31,4 @@ reserve :: Reservation -> ReservationPersistenceAction (Either Error ())
 reserve r = do
       i <- getReservedSeats $ date r
       newRes <- either (const $ tryExtendCapacity r) (return . return) (checkCapacity 10 i r)
-      let rr = fmap saveReservation newRes
-      return $ return ()
+      sequence $ fmap saveReservation newRes

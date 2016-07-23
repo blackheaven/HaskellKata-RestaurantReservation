@@ -9,6 +9,7 @@ import CaravanService
 import Utils
 import Types
 import Control.Monad((>=>), liftM)
+import Control.Monad.Trans.Either(EitherT(..), runEitherT, left, right)
 
 connStr :: ConnectionString
 connStr = "."
@@ -16,19 +17,19 @@ connStr = "."
 svcAddr :: ServiceAddress
 svcAddr = "."
 
-tryRentCaravan :: Reservation -> CaravanServiceAction (Either Error Reservation)
+tryRentCaravan :: Reservation -> EitherT Error CaravanServiceAction Reservation
 tryRentCaravan reservation = do
-  foundCaravan <- findCaravan (quantity reservation) (date reservation)
-  let eitherCaravan = maybeToEither CapacityExceeded id foundCaravan
-  let newRes = eitherCaravan >>= \c -> (fmap (\r -> (c, r)) $ checkCaravanCapacity reservation c)
-  either (return . Left) (\(c, r) -> (reserveCaravan (date r) c >> return (return r))) newRes
+  foundCaravan <- EitherT $ fmap (maybeToEither CapacityExceeded id) $ findCaravan (quantity reservation) (date reservation)
+  let newRes = checkCaravanCapacity reservation foundCaravan
+  either left (\r -> EitherT (fmap return (reserveCaravan (date r) foundCaravan)) >> right r) newRes
+
 postReservation :: ReservationRendition -> IO (HttpResult ())
 postReservation =
-  fmap toHttpResult . run . either (return . Left) reserve . validateReservation
-  where run = runReservationPersistenceFile connStr (runCaravanServiceFile svcAddr . tryRentCaravan)
+  fmap toHttpResult . run . either (return . Left) (runEitherT . reserve) . validateReservation
+  where run = runReservationPersistenceFile connStr (runCaravanServiceFile svcAddr . runEitherT . tryRentCaravan)
 
-reserve :: Reservation -> ReservationPersistenceAction (Either Error ())
+reserve :: Reservation -> EitherT Error ReservationPersistenceAction ()
 reserve r = do
-      i <- getReservedSeats $ date r
-      newRes <- either (const $ tryExtendCapacity r) (return . return) (checkCapacity 10 i r)
-      sequence $ fmap saveReservation newRes
+      i <- EitherT $ fmap return $ getReservedSeats $ date r
+      newRes <- either (const $ EitherT $ tryExtendCapacity r) right (checkCapacity 10 i r)
+      EitherT $ fmap return $ saveReservation newRes
